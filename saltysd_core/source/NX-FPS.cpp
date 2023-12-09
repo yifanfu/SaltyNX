@@ -175,6 +175,7 @@ struct {
 	uintptr_t nvnMemoryPoolBuilderSetStorage;
 	uintptr_t nvnMemoryPoolInitialize;
 	uintptr_t nvnCommandBufferSetRenderTargets;
+	uintptr_t nvnCommandBufferCopyTextureToTexture;
 } Ptrs;
 
 struct {
@@ -190,6 +191,7 @@ struct {
 	uintptr_t eglSwapBuffers;
 	uintptr_t eglSwapInterval;
 	uintptr_t nvnCommandBufferSetRenderTargets;
+	uintptr_t nvnCommandBufferCopyTextureToTexture;
 } Address;
 
 struct {
@@ -236,6 +238,7 @@ typedef bool (*nvnMemoryPoolInitialize_0)(NVNMemoryPool* _nvnMemoryPool, NVNMemo
 typedef void (*nvnMemoryPoolFinalize_0)(NVNMemoryPool* _nvnMemoryPool);
 typedef void (*nvnMemoryPoolBuilderSetStorage_0)(NVNMemoryPoolBuilder* _nvnMemoryPoolBuilder, void* buffer, size_t size);
 typedef void (*nvnCommandBufferSetRenderTargets_0)(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, void* unk1, NVNTexture* nvnDepthTexture, void* unk2);
+typedef void (*nvnCommandBufferCopyTextureToTexture_0)(const void* nvnCommandBuffer, const NVNTexture* nvnTextureSrc, void* unk1, void* unk2, const NVNTexture* nvnTextureDst, void* unk3, void* unk4);
 
 void* WindowSync = 0;
 uint64_t startFrameTick = 0;
@@ -574,12 +577,24 @@ uintptr_t eglGetProc(const char* eglName) {
 	return ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
 }
 
+const int debugTargetBufferCount = 3;
+NVNTexture* orig_nvnTextures[debugTargetBufferCount] = {0};
 int numBufferedFrames_orig = 0;
 int texture_index = 0;
+void nvnCommandBufferCopyTextureToTexture(const void* nvnCommandBuffer, const NVNTexture* nvnTextureSrc, void* unk1, void* unk2, NVNTexture* nvnTextureDst, void* unk3, void* unk4) {
+	if (numBufferedFrames_orig == debugTargetBufferCount && orig_nvnTextures[0]) {
+		for (int index = 0; index < numBufferedFrames_orig; index++) {
+			if (nvnTextureDst == orig_nvnTextures[index]) {
+				nvnTextureDst = Frame_buffers[index];
+			}
+		}
+	}
+	return ((nvnCommandBufferCopyTextureToTexture_0)(Ptrs.nvnCommandBufferCopyTextureToTexture))(nvnCommandBuffer, nvnTextureSrc, unk1, unk2, nvnTextureDst, unk3, unk4);
+}
 
 void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, void* unk1, NVNTexture* nvnDepthTexture, void* unk2) {
-	if (numBufferedFrames_orig == 2) {
-        if (numBufferedFrames == 1) { 
+	if (numBufferedFrames_orig == debugTargetBufferCount) {
+        if (numBufferedFrames == 1 && nvnTextures[0] == orig_nvnTextures[texture_index]) { 
             nvnTextures = &Frame_buffers[texture_index];
         }
 		else if (nvnTextures[0] == Frame_buffers[0]) {
@@ -596,8 +611,11 @@ void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int n
 		numBufferedFrames = *(Shared.SetBuffers);
 	}
 	*(Shared.ActiveBuffers) = numBufferedFrames;
-	if (numBufferedFrames == 2) {
-		numBufferedFrames_orig = 2;
+	if (numBufferedFrames == debugTargetBufferCount) {
+		numBufferedFrames_orig = debugTargetBufferCount;
+		for (int i = 0; i < debugTargetBufferCount; i++) {
+			orig_nvnTextures[i] = nvnTextures[i];
+		}
 		static bool initialized = false;
 		static void* buffer = 0;
 
@@ -935,6 +953,10 @@ uintptr_t nvnGetProcAddress (NVNDevice* nvnDevice, const char* nvnFunction) {
 		Ptrs.nvnCommandBufferSetRenderTargets = address;
 		return Address.nvnCommandBufferSetRenderTargets;
 	}
+	else if (!strcmp("nvnCommandBufferCopyTextureToTexture", nvnFunction)) {
+		Ptrs.nvnCommandBufferCopyTextureToTexture = address;
+		return Address.nvnCommandBufferCopyTextureToTexture;		
+	}
 	return address;
 }
 
@@ -1004,6 +1026,7 @@ extern "C" {
 			Address.eglSwapBuffers = (uint64_t)&eglSwap;
 			Address.eglSwapInterval = (uint64_t)&eglInterval;
 			Address.nvnCommandBufferSetRenderTargets = (uint64_t)&nvnCommandBufferSetRenderTargets;
+			Address.nvnCommandBufferCopyTextureToTexture = (uint64_t)&nvnCommandBufferCopyTextureToTexture;
 
 			char titleid[17];
 			CheckTitleID(&titleid[0]);
