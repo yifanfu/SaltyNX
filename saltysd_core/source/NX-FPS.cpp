@@ -206,7 +206,7 @@ bool changeFPS = false;
 bool changedFPS = false;
 typedef void (*nvnBuilderSetTextures_0)(const nvnWindowBuilder* nvnWindowBuilder, int buffers, NVNTexture** texturesBuffer);
 typedef void (*nvnWindowSetNumActiveTextures_0)(const NVNWindow* nvnWindow, int buffers);
-typedef void* (*nvnWindowAcquireTexture_0)(const NVNWindow* nvnWindow, const void* nvnSync, const void* index);
+typedef void* (*nvnWindowAcquireTexture_0)(const NVNWindow* nvnWindow, const void* nvnSync, int* index);
 typedef void (*nvnSetPresentInterval_0)(const NVNWindow* nvnWindow, int mode);
 typedef int (*nvnGetPresentInterval_0)(const NVNWindow* nvnWindow);
 typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
@@ -574,21 +574,14 @@ uintptr_t eglGetProc(const char* eglName) {
 	return ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
 }
 
-NVNTexture** orig_nvnTextures = 0;
 int numBufferedFrames_orig = 0;
+int texture_index = 0;
 
 void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, void* unk1, NVNTexture* nvnDepthTexture, void* unk2) {
 	if (numBufferedFrames_orig == 2) {
-		if (numBufferedFrames == 1) { 
-			int index = 0;
-			while (index < numBufferedFrames_orig) {
-				if (nvnTextures[0] == orig_nvnTextures[index]) {
-					nvnTextures = &Frame_buffers[index];
-					break;
-				}
-				index++;
-			}
-		}
+        if (numBufferedFrames == 1) { 
+            nvnTextures = &Frame_buffers[texture_index];
+        }
 		else if (nvnTextures[0] == Frame_buffers[0]) {
 			nvnTextures = Frame_buffers;
 			numBufferedFrames = 3;
@@ -603,7 +596,6 @@ void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int n
 		numBufferedFrames = *(Shared.SetBuffers);
 	}
 	*(Shared.ActiveBuffers) = numBufferedFrames;
-	orig_nvnTextures = nvnTextures;
 	if (numBufferedFrames == 2) {
 		numBufferedFrames_orig = 2;
 		static bool initialized = false;
@@ -821,12 +813,13 @@ void nvnPresentTexture(const void* _this, const NVNWindow* nvnWindow, const void
 	return;
 }
 
-void* nvnAcquireTexture(const NVNWindow* nvnWindow, const void* nvnSync, const void* index) {
+void* nvnAcquireTexture(const NVNWindow* nvnWindow, const void* nvnSync, int* index) {
 	if (WindowSync != nvnSync) {
 		WindowSync = (void*)nvnSync;
 	}
 	void* ret = ((nvnWindowAcquireTexture_0)(Ptrs.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
 	startFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+	texture_index = *index;
 	return ret;
 }
 
