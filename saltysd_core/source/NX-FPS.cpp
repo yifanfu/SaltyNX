@@ -582,7 +582,7 @@ void nvnCommandBufferCopyTextureToTexture(const void* nvnCommandBuffer, const NV
 
 void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, void* unk1, NVNTexture* nvnDepthTexture, void* unk2) {
 	if (isDoubleBuffer) {
-        if (numBufferedFrames == 1 && nvnTextures[0] == orig_nvnTextures) { 
+        if (numBufferedFrames == 1 && nvnTextures[0] == orig_nvnTexture) { 
             nvnTextures = &Frame_buffers[2];
         }
 		else if (nvnTextures[0] == Frame_buffers[0]) {
