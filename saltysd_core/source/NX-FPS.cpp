@@ -35,13 +35,6 @@ struct NVNMemoryPoolBuilder {
 	char reserved[0x40];
 };
 
-struct NVNRectangle {
-	int height;
-	int width;
-	int x;
-	int y;
-};
-
 typedef int NVNtextureFlags;
 typedef int NVNtextureTarget;
 typedef int NVNformat;
