@@ -594,12 +594,7 @@ void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBuffe
 }
 
 void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int numBufferedFrames, NVNTexture** nvnTextures) {
-	*(Shared.Buffers) = numBufferedFrames;
-	if (*(Shared.SetBuffers) >= 2 && *(Shared.SetBuffers) <= numBufferedFrames) {
-		numBufferedFrames = *(Shared.SetBuffers);
-	}
-	*(Shared.ActiveBuffers) = numBufferedFrames;
-	if (numBufferedFrames == 2) {
+	if (numBufferedFrames == 2 && *(Shared.SetBuffers) == 3) {
 		isDoubleBuffer = true;
 		//Copying overflowed pointer
 		orig_nvnTexture = nvnTextures[2];
@@ -647,7 +642,16 @@ void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int n
 		Frame_buffers[2] = &m_ThirdBuffer;
 		nvnTextures = Frame_buffers;
 		numBufferedFrames = 3;
+		*(Shared.Buffers) = 3;
+		*(Shared.ActiveBuffers) = 3;
+		*(Shared.SetActiveBuffers) = 2;
+
 	}
+	else if (*(Shared.SetBuffers) >= 2 && *(Shared.SetBuffers) <= numBufferedFrames) {
+		numBufferedFrames = *(Shared.SetBuffers);
+	}
+	*(Shared.Buffers) = numBufferedFrames;
+	*(Shared.ActiveBuffers) = numBufferedFrames;
 	return ((nvnBuilderSetTextures_0)(Ptrs.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
 }
 
