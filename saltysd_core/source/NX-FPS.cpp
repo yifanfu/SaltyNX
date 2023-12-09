@@ -577,25 +577,20 @@ uintptr_t eglGetProc(const char* eglName) {
 	return ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
 }
 
-const int debugTargetBufferCount = 3;
-NVNTexture* orig_nvnTextures[debugTargetBufferCount] = {0};
-int numBufferedFrames_orig = 0;
+NVNTexture* orig_nvnTexture = 0;
+bool isDoubleBuffer = false;
 int texture_index = 0;
 void nvnCommandBufferCopyTextureToTexture(const void* nvnCommandBuffer, const NVNTexture* nvnTextureSrc, void* unk1, void* unk2, NVNTexture* nvnTextureDst, void* unk3, void* unk4) {
-	if (numBufferedFrames_orig == debugTargetBufferCount && orig_nvnTextures[0]) {
-		for (int index = 0; index < numBufferedFrames_orig; index++) {
-			if (nvnTextureDst == orig_nvnTextures[index]) {
-				nvnTextureDst = Frame_buffers[index];
-			}
-		}
+	if (isDoubleBuffer && nvnTextureDst == orig_nvnTexture) {
+		nvnTextureDst = Frame_buffers[2];
 	}
 	return ((nvnCommandBufferCopyTextureToTexture_0)(Ptrs.nvnCommandBufferCopyTextureToTexture))(nvnCommandBuffer, nvnTextureSrc, unk1, unk2, nvnTextureDst, unk3, unk4);
 }
 
 void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, void* unk1, NVNTexture* nvnDepthTexture, void* unk2) {
-	if (numBufferedFrames_orig == debugTargetBufferCount) {
-        if (numBufferedFrames == 1 && nvnTextures[0] == orig_nvnTextures[texture_index]) { 
-            nvnTextures = &Frame_buffers[texture_index];
+	if (isDoubleBuffer) {
+        if (numBufferedFrames == 1 && nvnTextures[0] == orig_nvnTextures) { 
+            nvnTextures = &Frame_buffers[2];
         }
 		else if (nvnTextures[0] == Frame_buffers[0]) {
 			nvnTextures = Frame_buffers;
@@ -611,11 +606,10 @@ void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int n
 		numBufferedFrames = *(Shared.SetBuffers);
 	}
 	*(Shared.ActiveBuffers) = numBufferedFrames;
-	if (numBufferedFrames == debugTargetBufferCount) {
-		numBufferedFrames_orig = debugTargetBufferCount;
-		for (int i = 0; i < debugTargetBufferCount; i++) {
-			orig_nvnTextures[i] = nvnTextures[i];
-		}
+	if (numBufferedFrames == 2) {
+		isDoubleBuffer = true;
+		//Copying overflowed pointer
+		orig_nvnTexture = nvnTextures[2];
 		static bool initialized = false;
 		static void* buffer = 0;
 
