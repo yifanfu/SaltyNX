@@ -574,11 +574,25 @@ uintptr_t eglGetProc(const char* eglName) {
 	return ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
 }
 
-void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, void* unk1, NVNTexture* nvnDepthTexture, void* unk2) {
+NVNTexture** orig_nvnTextures = 0;
+int numBufferedFrames_orig = 0;
 
-	if (numBufferedFrames == 3) {
-		nvnTextures = &Frame_buffers[0];
-		numBufferedFrames = 3;
+void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, void* unk1, NVNTexture* nvnDepthTexture, void* unk2) {
+	if (numBufferedFrames_orig == 2) {
+		if (numBufferedFrames == 1) { 
+			int index = 0;
+			while (index < numBufferedFrames_orig) {
+				if (nvnTextures[0] == orig_nvnTextures[index]) {
+					nvnTextures = &Frame_buffers[index];
+					break;
+				}
+				index++;
+			}
+		}
+		else if (nvnTextures[0] == Frame_buffers[0]) {
+			nvnTextures = Frame_buffers;
+			numBufferedFrames = 3;
+		}
 	}
 	return ((nvnCommandBufferSetRenderTargets_0)(Ptrs.nvnCommandBufferSetRenderTargets))(nvnCommandBuffer, numBufferedFrames, nvnTextures, unk1, nvnDepthTexture, unk2);
 }
@@ -589,7 +603,9 @@ void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int n
 		numBufferedFrames = *(Shared.SetBuffers);
 	}
 	*(Shared.ActiveBuffers) = numBufferedFrames;
-	if (numBufferedFrames == 3) {
+	orig_nvnTextures = nvnTextures;
+	if (numBufferedFrames == 2) {
+		numBufferedFrames_orig = 2;
 		static bool initialized = false;
 		static void* buffer = 0;
 
@@ -632,7 +648,7 @@ void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int n
 		Frame_buffers[0] = nvnTextures[0];
 		Frame_buffers[1] = nvnTextures[1];
 		Frame_buffers[2] = &m_ThirdBuffer;
-		nvnTextures = &Frame_buffers[0];
+		nvnTextures = Frame_buffers;
 		numBufferedFrames = 3;
 	}
 	return ((nvnBuilderSetTextures_0)(Ptrs.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
