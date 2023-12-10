@@ -570,34 +570,28 @@ uintptr_t eglGetProc(const char* eglName) {
 	return ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
 }
 
-NVNTexture* orig_nvnTexture = 0;
+NVNTexture** orig_nvnTextures = 0;
 bool isDoubleBuffer = false;
-int texture_index = 0;
+int texture_index = -1;
 void nvnCommandBufferCopyTextureToTexture(const void* nvnCommandBuffer, const NVNTexture* nvnTextureSrc, void* unk1, void* unk2, NVNTexture* nvnTextureDst, void* unk3, void* unk4) {
-	if (isDoubleBuffer && nvnTextureDst == orig_nvnTexture) {
-		nvnTextureDst = Frame_buffers[2];
+	if (isDoubleBuffer) {
+		nvnTextureDst = Frame_buffers[texture_index];
 	}
 	return ((nvnCommandBufferCopyTextureToTexture_0)(Ptrs.nvnCommandBufferCopyTextureToTexture))(nvnCommandBuffer, nvnTextureSrc, unk1, unk2, nvnTextureDst, unk3, unk4);
 }
 
 void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, void* unk1, NVNTexture* nvnDepthTexture, void* unk2) {
 	if (isDoubleBuffer) {
-        if (numBufferedFrames == 1 && nvnTextures[0] == orig_nvnTexture) { 
-            nvnTextures = &Frame_buffers[2];
-        }
-		else if (nvnTextures[0] == Frame_buffers[0]) {
-			nvnTextures = Frame_buffers;
-			numBufferedFrames = 3;
-		}
+		if (nvnTextures[0] == orig_nvnTextures[2])
+			nvnTextures[0] = Frame_buffers[2];
 	}
 	return ((nvnCommandBufferSetRenderTargets_0)(Ptrs.nvnCommandBufferSetRenderTargets))(nvnCommandBuffer, numBufferedFrames, nvnTextures, unk1, nvnDepthTexture, unk2);
 }
 
 void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int numBufferedFrames, NVNTexture** nvnTextures) {
-	if (numBufferedFrames == 2 && *(Shared.SetBuffers) == 3) {
+	if (numBufferedFrames == 2 /*&& *(Shared.SetBuffers) == 3*/) {
 		isDoubleBuffer = true;
-		//Copying overflowed pointer
-		orig_nvnTexture = nvnTextures[2];
+		orig_nvnTextures = nvnTextures;
 		static bool initialized = false;
 		static void* buffer = 0;
 
