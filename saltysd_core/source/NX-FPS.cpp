@@ -35,6 +35,10 @@ struct NVNMemoryPoolBuilder {
 	char reserved[0x40];
 };
 
+struct NVNTextureView {
+	char reserved[0x28];
+};
+
 typedef int NVNtextureFlags;
 typedef int NVNtextureTarget;
 typedef int NVNformat;
@@ -45,6 +49,7 @@ NVNDevice* m_nvnDevice = 0;
 NVNMemoryPool* m_nvnMemoryPool = 0;
 NVNMemoryPool m_ThirdBufferPool = {0};
 NVNTexture m_ThirdBuffer = {0};
+NVNTextureView m_ThirdBufferView = {0};
 NVNTextureBuilder m_nvnTextureBuilder = {0};
 NVNMemoryPoolBuilder m_nvnMemoryPoolBuilder = {0};
 
@@ -169,6 +174,15 @@ struct {
 	uintptr_t nvnMemoryPoolInitialize;
 	uintptr_t nvnCommandBufferSetRenderTargets;
 	uintptr_t nvnCommandBufferCopyTextureToTexture;
+	uintptr_t nvnTextureViewGetLevels;
+	uintptr_t nvnTextureViewGetFormat;
+	uintptr_t nvnTextureViewGetLayers;
+	uintptr_t nvnTextureViewGetTarget;
+	uintptr_t nvnTextureViewSetLevels;
+	uintptr_t nvnTextureViewSetFormat;
+	uintptr_t nvnTextureViewSetLayers;
+	uintptr_t nvnTextureViewSetTarget;
+	uintptr_t nvnTextureViewSetDefaults;
 } Ptrs;
 
 struct {
@@ -230,8 +244,17 @@ typedef size_t (*nvnTextureBuilderGetStorageAlignment_0)(NVNTextureBuilder* _nvn
 typedef bool (*nvnMemoryPoolInitialize_0)(NVNMemoryPool* _nvnMemoryPool, NVNMemoryPoolBuilder* _nvnMemoryPoolBuilder);
 typedef void (*nvnMemoryPoolFinalize_0)(NVNMemoryPool* _nvnMemoryPool);
 typedef void (*nvnMemoryPoolBuilderSetStorage_0)(NVNMemoryPoolBuilder* _nvnMemoryPoolBuilder, void* buffer, size_t size);
-typedef void (*nvnCommandBufferSetRenderTargets_0)(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, void* unk1, NVNTexture* nvnDepthTexture, void* unk2);
-typedef void (*nvnCommandBufferCopyTextureToTexture_0)(const void* nvnCommandBuffer, const NVNTexture* nvnTextureSrc, void* unk1, void* unk2, const NVNTexture* nvnTextureDst, void* unk3, void* unk4);
+typedef void (*nvnCommandBufferSetRenderTargets_0)(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, NVNTextureView** nvnTextureViews, NVNTexture* nvnDepthTexture, NVNTextureView* nvnDepthTextureView);
+typedef void (*nvnCommandBufferCopyTextureToTexture_0)(const void* nvnCommandBuffer, const NVNTexture* nvnTextureSrc, NVNTextureView* nvnTextureSrcView, void* unk2, const NVNTexture* nvnTextureDst, NVNTextureView* nvnTextureDstView, void* unk4);
+typedef bool (*nvnTextureViewGetFormat_0)(const NVNTextureView *nvnTextureView, NVNformat *nvnFormat);
+typedef bool (*nvnTextureViewGetTarget_0)(const NVNTextureView *nvnTextureView, NVNtextureTarget *target);
+typedef bool (*nvnTextureViewGetLevels_0)(const NVNtextureView *nvnTextureView, int *nvnTextureLevel, int *numLevels);
+typedef bool (*nvnTextureViewGetLayers_0)(const NVNtextureView *nvnTextureView, int *numLayer, int *numLayers);
+typedef bool (*nvnTextureViewSetFormat_0)(const NVNTextureView *nvnTextureView, NVNformat nvnFormat);
+typedef bool (*nvnTextureViewSetTarget_0)(const NVNTextureView *nvnTextureView, NVNtextureTarget target);
+typedef bool (*nvnTextureViewSetLevels_0)(const NVNtextureView *nvnTextureView, int nvnTextureLevel, int numLevels);
+typedef bool (*nvnTextureViewSetLayers_0)(const NVNtextureView *nvnTextureView, int numLayer, int numLayers);
+typedef void (*nvnTextureViewSetDefaults_0)(const NVNtextureView *nvnTextureView);
 
 void* WindowSync = 0;
 uint64_t startFrameTick = 0;
@@ -570,20 +593,38 @@ uintptr_t eglGetProc(const char* eglName) {
 	return ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
 }
 
-NVNTexture** orig_nvnTextures = 0;
+NVNTexture* orig_nvnTextures[2] = {0};
 bool isDoubleBuffer = false;
 int texture_index = -1;
-void nvnCommandBufferCopyTextureToTexture(const void* nvnCommandBuffer, const NVNTexture* nvnTextureSrc, void* unk1, void* unk2, NVNTexture* nvnTextureDst, void* unk3, void* unk4) {
-	if (isDoubleBuffer) {
+void nvnCommandBufferCopyTextureToTexture(const void* nvnCommandBuffer, const NVNTexture* nvnTextureSrc, NVNTextureView* nvnTextureSrcView, void* unk2, NVNTexture* nvnTextureDst, NVNTextureView* nvnTextureDstView, void* unk4) {
+	if (isDoubleBuffer && texture_index == 2) {
 		nvnTextureDst = Frame_buffers[texture_index];
 	}
 	return ((nvnCommandBufferCopyTextureToTexture_0)(Ptrs.nvnCommandBufferCopyTextureToTexture))(nvnCommandBuffer, nvnTextureSrc, unk1, unk2, nvnTextureDst, unk3, unk4);
 }
 
-void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, void* unk1, NVNTexture* nvnDepthTexture, void* unk2) {
+void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBufferedFrames, NVNTexture** nvnTextures, NVNTextureView** nvnTexturesView, NVNTexture* nvnDepthTexture, NVNTextureView* nvnDepthTextureView) {
 	if (isDoubleBuffer) {
-		if (nvnTextures[0] == orig_nvnTextures[2])
-			nvnTextures[0] = Frame_buffers[2];
+		static bool initialized = false;
+		if (nvnTextures[0] == orig_nvnTextures[0]) {
+			initialized = true;
+			((nvnCommandBufferSetRenderTargets_0)(Ptrs.nvnCommandBufferSetRenderTargets))(nvnCommandBuffer, numBufferedFrames, nvnTextures, unk1, nvnDepthTexture, unk2);
+			NVNformat m_nvnformat = 0;
+			((nvnTextureViewGetFormat_0)(Ptrs.nvnTextureViewGetFormat))(nvnTexturesView[0], &m_nvnformat);
+			int m_nvnlevel = 0;
+			int m_nvnlevels = 0;
+			((nvnTextureViewGetLevels_0)(Ptrs.nvnTextureViewGetLevels))(nvnTexturesView[0], &m_nvnlevel, &m_nvnlevels);
+			NVNtextureTarget m_nvnTextureTarget = 0;
+			((nvnTextureViewGetTarget_0)(Ptrs.nvnTextureViewGetTarget))(nvnTexturesView[0], &m_nvnTextureTarget);
+			int m_nvnlayer = 0;
+			int m_nvnlayers = 0;
+			((nvnTextureViewGetLayers_0)(Ptrs.nvnTextureViewGetLayers))(nvnTexturesView[0], &m_nvnlayer, &m_nvnlayers);
+			((nvnTextureViewSetDefaults_0)(Ptrs.nvnTextureViewSetDefaults))(&m_ThirdBufferView);
+			((nvnTextureViewSetFormat_0)(Ptrs.nvnTextureViewSetFormat))(&m_ThirdBufferView, m_nvnformat);
+			((nvnTextureViewSetLevels_0)(Ptrs.nvnTextureViewSetLevels))(&m_ThirdBufferView, m_nvnlevel, m_nvnlevels);
+			((nvnTextureViewSetTarget_0)(Ptrs.nvnTextureViewSetTarget))(&m_ThirdBufferView, m_nvnTextureTarget);
+			((nvnTextureViewSetLayers_0)(Ptrs.nvnTextureViewSetTarget))(&m_ThirdBufferView, m_nvnlayer, m_nvnlayers);
+		}
 	}
 	return ((nvnCommandBufferSetRenderTargets_0)(Ptrs.nvnCommandBufferSetRenderTargets))(nvnCommandBuffer, numBufferedFrames, nvnTextures, unk1, nvnDepthTexture, unk2);
 }
@@ -591,7 +632,8 @@ void nvnCommandBufferSetRenderTargets(const void* nvnCommandBuffer, int numBuffe
 void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int numBufferedFrames, NVNTexture** nvnTextures) {
 	if (numBufferedFrames == 2 /*&& *(Shared.SetBuffers) == 3*/) {
 		isDoubleBuffer = true;
-		orig_nvnTextures = nvnTextures;
+		orig_nvnTextures[0] = nvnTextures[0];
+		orig_nvnTextures[1] = nvnTextures[1];
 		static bool initialized = false;
 		static void* buffer = 0;
 
@@ -941,6 +983,33 @@ uintptr_t nvnGetProcAddress (NVNDevice* nvnDevice, const char* nvnFunction) {
 	else if (!strcmp("nvnCommandBufferCopyTextureToTexture", nvnFunction)) {
 		Ptrs.nvnCommandBufferCopyTextureToTexture = address;
 		return Address.nvnCommandBufferCopyTextureToTexture;		
+	}
+	else if (!strcmp("nvnTextureViewGetLevels", nvnFunction)) {
+		Ptrs.nvnTextureViewGetLevels = address;
+	}
+	else if (!strcmp("nvnTextureViewGetTarget", nvnFunction)) {
+		Ptrs.nvnTextureViewGetTarget = address;
+	}
+	else if (!strcmp("nvnTextureViewGetLayers", nvnFunction)) {
+		Ptrs.nvnTextureViewGetLayers = address;
+	}
+	else if (!strcmp("nvnTextureViewGetFormat", nvnFunction)) {
+		Ptrs.nvnTextureViewGetFormat = address;
+	}
+	else if (!strcmp("nvnTextureViewSetLevels", nvnFunction)) {
+		Ptrs.nvnTextureViewSetLevels = address;
+	}
+	else if (!strcmp("nvnTextureViewSetTarget", nvnFunction)) {
+		Ptrs.nvnTextureViewSetTarget = address;
+	}
+	else if (!strcmp("nvnTextureViewSetLayers", nvnFunction)) {
+		Ptrs.nvnTextureViewSetLayers = address;
+	}
+	else if (!strcmp("nvnTextureViewSetFormat", nvnFunction)) {
+		Ptrs.nvnTextureViewSetFormat = address;
+	}
+	else if (!strcmp("nvnTextureViewSetDefaults", nvnFunction)) {
+		Ptrs.nvnTextureViewSetDefaults = address;
 	}
 	return address;
 }
