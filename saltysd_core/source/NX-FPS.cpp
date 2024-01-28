@@ -156,6 +156,7 @@ typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction
 
 bool changeFPS = false;
 bool changedFPS = false;
+bool skipAcquired = false;
 typedef void (*nvnBuilderSetTextures_0)(const nvnWindowBuilder* nvnWindowBuilder, int buffers, NVNTexture** texturesBuffer);
 typedef void (*nvnWindowSetNumActiveTextures_0)(const NVNWindow* nvnWindow, int buffers);
 typedef bool (*nvnWindowInitialize_0)(const NVNWindow* nvnWindow, struct nvnWindowBuilder* windowBuilder);
@@ -589,14 +590,11 @@ void nvnPresentTexture(const void* _this, const NVNWindow* nvnWindow, const void
 	}
 	
 	if (FPSlock) {
-		if ((*(Shared.ZeroSync) == ZeroSyncType_None) && FPStiming && (FPSlock == 60 || FPSlock == 30)) {
+		if ((*(Shared.ZeroSync) == ZeroSyncType_None) && FPStiming && (FPSlock == 60 || FPSlock == 30) && !*(Shared.skipAcquire)) {
 			FPStiming = 0;
 		}
 		else if ((*(Shared.ZeroSync) != ZeroSyncType_None) && !FPStiming) {
-			if (FPSlock == 60) {
-				FPStiming = (systemtickfrequency/(*(Shared.FPSlocked))) - 8000;
-			}
-			else FPStiming = (systemtickfrequency/(*(Shared.FPSlocked))) - 6000;
+			FPStiming = (systemtickfrequency/(*(Shared.FPSlocked))) - 6000;
 		}
 	}
 
@@ -652,9 +650,10 @@ void nvnPresentTexture(const void* _this, const NVNWindow* nvnWindow, const void
 	*(Shared.FPSavg) = Stats.FPSavg;
 	*(Shared.pluginActive) = true;
 
-	if (FPSlock != *(Shared.FPSlocked)) {
+	if (FPSlock != *(Shared.FPSlocked) || *(Shared.skipAcquire) != skipAcquired) {
 		changeFPS = true;
 		changedFPS = false;
+		skipAcquired = *(Shared.skipAcquire);
 		if (*(Shared.FPSlocked) == 0) {
 			FPStiming = 0;
 			changeFPS = false;
@@ -662,22 +661,16 @@ void nvnPresentTexture(const void* _this, const NVNWindow* nvnWindow, const void
 		}
 		else if (*(Shared.FPSlocked) <= 30) {
 			nvnSetPresentInterval(nvnWindow, -2);
-			if (*(Shared.FPSlocked) != 30 || *(Shared.ZeroSync)) {
-				if (*(Shared.FPSlocked) == 30) {
-					FPStiming = (systemtickfrequency/(*(Shared.FPSlocked))) - 8000;
-				}
-				else FPStiming = (systemtickfrequency/(*(Shared.FPSlocked))) - 6000;
+			if (*(Shared.FPSlocked) != 30 || *(Shared.ZeroSync) || (*(Shared.FPSlocked) && *(Shared.skipAcquire))) {
+				FPStiming = (systemtickfrequency/(*(Shared.FPSlocked))) - 6000;
 			}
 			else FPStiming = 0;
 		}
 		else {
 			nvnSetPresentInterval(nvnWindow, -2); //This allows in game with glitched interval to unlock 60 FPS, f.e. WRC Generations
 			nvnSetPresentInterval(nvnWindow, -1);
-			if (*(Shared.FPSlocked) != 60 || *(Shared.ZeroSync)) {
-				if (*(Shared.FPSlocked) == 60) {
-					FPStiming = (systemtickfrequency/(*(Shared.FPSlocked))) - 8000;
-				}
-				else FPStiming = (systemtickfrequency/(*(Shared.FPSlocked))) - 6000;
+			if (*(Shared.FPSlocked) != 60 || *(Shared.ZeroSync) || (*(Shared.FPSlocked) && *(Shared.skipAcquire))) {
+				FPStiming = (systemtickfrequency/(*(Shared.FPSlocked))) - 6000;
 			}
 			else FPStiming = 0;
 		}
