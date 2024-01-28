@@ -23,6 +23,10 @@ struct NVNDevice {
 	char reserved[0x3000];
 };
 
+struct NVNQueue {
+	char reserved[0x8];
+};
+
 typedef int NVNtextureFlags;
 typedef int NVNtextureTarget;
 typedef int NVNformat;
@@ -106,6 +110,7 @@ struct {
 	uint8_t* SetBuffers = 0;
 	uint8_t* ActiveBuffers = 0;
 	uint8_t* SetActiveBuffers = 0;
+	bool* skipAcquire = 0;
 } Shared;
 
 struct {
@@ -116,6 +121,7 @@ struct {
 	uintptr_t nvnWindowGetPresentInterval;
 	uintptr_t nvnWindowBuilderSetTextures;
 	uintptr_t nvnWindowAcquireTexture;
+	uintptr_t nvnQueueAcquireTexture;
 	uintptr_t nvnSyncWait;
 
 	uintptr_t nvnWindowSetNumActiveTextures;
@@ -128,6 +134,7 @@ struct {
 	uintptr_t nvnWindowSetPresentInterval;
 	uintptr_t nvnWindowBuilderSetTextures;
 	uintptr_t nvnWindowAcquireTexture;
+	uintptr_t nvnQueueAcquireTexture;
 	uintptr_t nvnSyncWait;
 	uintptr_t nvnGetProcAddress;
 	uintptr_t nvnWindowSetNumActiveTextures;
@@ -153,6 +160,7 @@ typedef void (*nvnBuilderSetTextures_0)(const nvnWindowBuilder* nvnWindowBuilder
 typedef void (*nvnWindowSetNumActiveTextures_0)(const NVNWindow* nvnWindow, int buffers);
 typedef bool (*nvnWindowInitialize_0)(const NVNWindow* nvnWindow, struct nvnWindowBuilder* windowBuilder);
 typedef void* (*nvnWindowAcquireTexture_0)(const NVNWindow* nvnWindow, const void* nvnSync, const void* index);
+typedef void* (*nvnQueueAcquireTexture_0)(const NVNQueue* nvnQueue, const NVNWindow* nvnWindow, const void* index);
 typedef void (*nvnSetPresentInterval_0)(const NVNWindow* nvnWindow, int mode);
 typedef int (*nvnGetPresentInterval_0)(const NVNWindow* nvnWindow);
 typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
@@ -685,8 +693,19 @@ void* nvnAcquireTexture(const NVNWindow* nvnWindow, const void* nvnSync, const v
 	if (WindowSync != nvnSync) {
 		WindowSync = (void*)nvnSync;
 	}
-	void* ret = ((nvnWindowAcquireTexture_0)(Ptrs.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
+	void* ret = 0;
+	if (!*(Shared.skipAcquire)) {
+		ret = ((nvnWindowAcquireTexture_0)(Ptrs.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
+	}
 	startFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+	return ret;
+}
+
+void* nvnQAcquireTexture(const NVNQueue* nvnQueue, const NVNWindow* nvnWindow, const void* index) {
+	void* ret = 0;
+	if (!*(Shared.skipAcquire)) {
+		ret = ((nvnQueueAcquireTexture_0)(Ptrs.nvnQueueAcquireTexture))(nvnQueue, nvnWindow, index);
+	}
 	return ret;
 }
 
@@ -702,6 +721,10 @@ uintptr_t nvnGetProcAddress (NVNDevice* nvnDevice, const char* nvnFunction) {
 	else if (!strcmp("nvnWindowAcquireTexture", nvnFunction)) {
 		Ptrs.nvnWindowAcquireTexture = address;
 		return Address.nvnWindowAcquireTexture;
+	}
+	else if (!strcmp("nvnQueueAcquireTexture", nvnFunction)) {
+		Ptrs.nvnQueueAcquireTexture = address;
+		return Address.nvnQueueAcquireTexture;
 	}
 	else if (!strcmp("nvnWindowSetPresentInterval", nvnFunction)) {
 		Ptrs.nvnWindowSetPresentInterval = address;
@@ -746,7 +769,7 @@ extern "C" {
 		SaltySDCore_printf("NX-FPS: alive\n");
 		LOCK::mappings.main_start = getMainAddress();
 		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::mappings.main_start);
-		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset, 59);
+		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset, 60);
 		SaltySDCore_printf("NX-FPS: ret: 0x%X\n", ret);
 		if (!ret) {
 			SaltySDCore_printf("NX-FPS: MemoryOffset: %d\n", SharedMemoryOffset);
@@ -761,6 +784,7 @@ extern "C" {
 			Address.nvnGetProcAddress = (uint64_t)&nvnGetProcAddress;
 			Address.nvnQueuePresentTexture = (uint64_t)&nvnPresentTexture;
 			Address.nvnWindowAcquireTexture = (uint64_t)&nvnAcquireTexture;
+			Address.nvnQueueAcquireTexture = (uint64_t)&nvnQAcquireTexture;
 			Address.nvnWindowInitialize = (uint64_t)&nvnWindowInitialize;
 			Address_weaks.nvnBootstrapLoader = SaltySDCore_FindSymbolBuiltin("nvnBootstrapLoader");
 			Address_weaks.eglSwapBuffers = SaltySDCore_FindSymbolBuiltin("eglSwapBuffers");
@@ -787,6 +811,7 @@ extern "C" {
 			Shared.SetBuffers = (uint8_t*)(base + 56);
 			Shared.ActiveBuffers = (uint8_t*)(base + 57);
 			Shared.SetActiveBuffers = (uint8_t*)(base + 58);
+			Shared.skipAcquire = (bool*)(base + 59);
 			Address.nvnWindowSetPresentInterval = (uint64_t)&nvnSetPresentInterval;
 			Address.nvnSyncWait = (uint64_t)&nvnSyncWait0;
 			Address.nvnWindowBuilderSetTextures = (uint64_t)&nvnWindowBuilderSetTextures;
@@ -810,6 +835,8 @@ extern "C" {
 				*(Shared.ZeroSync) = temp;
 				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
 					*(Shared.SetBuffers) = temp;
+				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
+					*(Shared.skipAcquire) = (bool)temp;
 				SaltySDCore_fclose(file_dat);
 			}
 
