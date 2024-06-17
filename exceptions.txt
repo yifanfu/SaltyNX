@@ -54,3 +54,7 @@ X0100964012528000
 ;Donkey Kong Country: Tropical Freeze
 ;Crash at second level
 X0100C1F0051B6000
+
+;Animal Crossing: New Horizon
+;2.0.6 - not working with Edizon or Zing
+X01006F8002326000
